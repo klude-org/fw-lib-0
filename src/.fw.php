@@ -43,7 +43,7 @@
 if(
     (\getenv('FW__LIB_SHELL') !== '0')
     && !\str_starts_with($_SERVER['argv'][1] ?? '', "--setup")
-    && \is_file($f = __DIR__.'/--fw/-fw/fw.php')
+    && \is_file($f = __DIR__.'/--fw/-fw/.fw.php')
 ){
     return include $f;
 }

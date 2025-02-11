@@ -84,8 +84,8 @@ if not defined FW__MY_DIR (
 
 SET CMD_FILE_A=%~dp0--fw\-cmd\__\%1\-@fw.bat
 SET CMD_FILE_B=%~dp0--fw\-cmd\__\%1-@fw.bat
-SET PHP_FILE_C=%~dp0--fw\-fw\fw.php
-SET PHP_FILE_D=%~dp0--fw\fw.php
+SET PHP_FILE_C=%~dp0--fw\-fw\.fw.php
+SET PHP_FILE_D=%~dp0--fw\.fw.php
 
 if exist "%CMD_FILE_A%" (
     call %CMD_FILE_B% %*
@@ -123,7 +123,7 @@ exit /b 0
 
 \defined('_\MSTART') OR \define('_\MSTART', \microtime(true));
 if(
-    \is_file($fw_dot_php = __DIR__.'/fw.php')
+    \is_file($fw_dot_php = __DIR__.'/.fw.php')
     && !\in_array('--self-refresh',$_SERVER['argv'] ?? null)
 ){
     return include $fw_dot_php;
@@ -139,7 +139,7 @@ try {
         );
     });
     if((function($f){
-        if(!($content = \file_get_contents("https://raw.githubusercontent.com/klude-org/fw-lib-0/main/src/fw.php"))){
+        if(!($content = \file_get_contents("https://raw.githubusercontent.com/klude-org/fw-lib-0/main/src/.fw.php"))){
             echo "\033[91mFailed: Unable to download CLI interface\033[0m\n";
             return; 
         }
