@@ -1,10 +1,48 @@
 <?php 
+########################################################################################################################
+#region LICENSE
+    /* 
+                                               EPX-WIN-SHELL-AUGMENT
+    PROVIDER : KLUDE PTY LTD
+    PACKAGE  : EPX-PAX
+    AUTHOR   : BRIAN PINTO
+    RELEASED : 2025-02-11
+    
+    The MIT License
+    
+    Copyright (c) 2017-2025 Klude Pty Ltd. https://klude.com.au
+    
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+    
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+    
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+    THE SOFTWARE.
+        
+    */
+#endregion
+# #######################################################################################################################
 
-# Version: #__FW_VERSION__#
+# Installed: #__FW_INSTALLED__#
+# i'd like to be a tree - pilu (._.) // please keep this line in all versions - BP
 
 \defined('_\MSTART') OR \define('_\MSTART', \microtime(true));
+\define('_\FSESS_DIR', \str_replace('\\','/', \getenv('FW__SESS_DIR') ?: \getcwd()));
+(\is_file($f = \_\FSESS_DIR."/.fw.config.php")) AND ($_ = \array_replace($_, \is_array($x = include $f) ? $x : []));
+
 if(
-    !\str_starts_with($_SERVER['argv'][1] ?? '', "--setup")
+    (\getenv('FW__LIB_SHELL') !== '0')
+    && !\str_starts_with($_SERVER['argv'][1] ?? '', "--setup")
     && \is_file($f = __DIR__.'/--fw/-fw/fw.php')
 ){
     return include $f;
@@ -16,9 +54,7 @@ try {
     
     \define('_\START_FILE', \str_replace('\\','/', __FILE__));
     \define('_\START_DIR', \dirname(\_\START_FILE));
-    \define('_\FSESS_DIR', \str_replace('\\','/', \getenv('FW__SESS_DIR') ?: \getcwd()));
     \define('_\INCP_DIR', \str_replace('\\','/', \dirname($_SERVER['SCRIPT_FILENAME'])));
-    (\is_file($f = \_\FSESS_DIR."/.fw.config.php")) AND ($_ = \array_replace($_, \is_array($x = include $f) ? $x : []));
     \set_include_path($_['TSP']['PATH'] ?? \_\START_DIR.PATH_SEPARATOR.\get_include_path());
     \spl_autoload_extensions('-#.php,/-#.php');
     \spl_autoload_register();
