@@ -1,23 +1,73 @@
 <?php 
 
-\defined('_\MSTART') OR \define('_\MSTART', \microtime(true));
-try {(function(){
-    
-    try {
+# Version: #__FW_VERSION__#
 
-        $this->fn = (object)[];
+\defined('_\MSTART') OR \define('_\MSTART', \microtime(true));
+if(
+    !\str_starts_with($_SERVER['argv'][1] ?? '', "--setup")
+    && \is_file($f = __DIR__.'/--fw/-fw/fw.php')
+){
+    return include $f;
+}
+try {
         
-        $this->fn->report = function($ex){
-            echo "\033[91m\n"
-                .$ex::class.": {$ex->getMessage()}\n"
-                ."File: {$ex->getFile()}\n"
-                ."Line: {$ex->getLine()}\n"
-                ."\033[31m{$ex}\033[0m\n"
-            ;
-            exit;
+    global $_;
+    (isset($_) && \is_array($_)) OR $_ = [];
+    
+    \define('_\START_FILE', \str_replace('\\','/', __FILE__));
+    \define('_\START_DIR', \dirname(\_\START_FILE));
+    \define('_\FSESS_DIR', \str_replace('\\','/', \getenv('FW__SESS_DIR') ?: \getcwd()));
+    \define('_\INCP_DIR', \str_replace('\\','/', \dirname($_SERVER['SCRIPT_FILENAME'])));
+    (\is_file($f = \_\FSESS_DIR."/.fw.config.php")) AND ($_ = \array_replace($_, \is_array($x = include $f) ? $x : []));
+    \set_include_path($_['TSP']['PATH'] ?? \_\START_DIR.PATH_SEPARATOR.\get_include_path());
+    \spl_autoload_extensions('-#.php,/-#.php');
+    \spl_autoload_register();
+    \set_error_handler(function($severity, $message, $file, $line){
+        throw new \ErrorException(
+            $message, 
+            0,
+            $severity, 
+            $file, 
+            $line
+        );
+    });
+    
+    $_REQUEST = (function(){
+        $parsed = [];
+        $key = null;
+        $args = \array_slice($argv = $_SERVER['argv'] ?? [], 1);
+        foreach ($args as $arg) {
+            if ($key !== null) {
+                $parsed[$key] = $arg;
+                $key = null;
+            } else if(\str_starts_with($arg, '-')){
+                if(\str_ends_with($arg, ':')){
+                    $key = \substr($arg,0,-1);
+                } else if(\str_contains($arg,':')) {
+                    [$k, $v] = \explode(':', $arg);
+                    $parsed[$k] = $v;
+                } else {
+                    $parsed[$arg] = true;
+                }
+            } else {
+                $parsed[] = $arg;
+            }
+        }
+        if ($key !== null) {
+            $parsed[$key] = true;
+        }
+        return $parsed;
+    })();
+    
+    if(!\is_null($_REQUEST['--setup'] ?? null)){
+        $fn__ = function($fname,...$args){
+            return $fname(...$args);
         };
-        
-        $this->fn->dump = function ($d){
+        $dump__fn = function ($d){
+            $d = array_diff_key($d, array_flip([
+                '_GET','_POST','_SERVER','_FILES','_COOKIE','_ENV',
+                'dump__fn','curl__fn','fs_delete__fn','_','f','argv','argc'
+            ]));
             echo "\033[97m"
                 ."    "
                 .\str_replace("\n","\n    ", \json_encode(
@@ -28,465 +78,281 @@ try {(function(){
                 ."\033[0m"
             ;
         };
-
-        $this->fn->fs_delete = function (string $path) {
-            $g = glob($path, (strpos($path,'{') === false) ? 0 : GLOB_BRACE);
-            foreach($g as $p){
-                if(is_dir($p)){
-                    foreach(new \RecursiveIteratorIterator(
-                        new \RecursiveDirectoryIterator($p, \RecursiveDirectoryIterator::SKIP_DOTS)
-                        , \RecursiveIteratorIterator::CHILD_FIRST
-                    ) as $f) {
-                        if ($f->isDir()){
-                            rmdir($f->getRealPath());
-                        } else {
-                            unlink($f->getRealPath());
-                        }
+        $fs_delete__fn = function($d){
+            if(\is_dir($d)){
+                foreach(new \RecursiveIteratorIterator(
+                    new \RecursiveDirectoryIterator($d, \RecursiveDirectoryIterator::SKIP_DOTS)
+                    , \RecursiveIteratorIterator::CHILD_FIRST
+                ) as $f) {
+                    if ($f->isDir()){
+                        \rmdir($f->getRealPath());
+                    } else {
+                        unlink($f->getRealPath());
                     }
-                    rmdir($p);
-                } else if(file_exists($p)) {
-                    unlink($p);
                 }
+                \rmdir($d);
             }
         };
-            
-        $this->fn->github_transact = function ($url, $is_json = false, $filter = false){
-            echo "URL: {$url}\n";
-            // Initialize cURL session
-            $ch = \curl_init();
-            
-            // Set the cURL options
-            \curl_setopt($ch, CURLOPT_URL, $url);
-            \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            \curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);  // Follow redirects
-            \curl_setopt($ch, CURLOPT_USERAGENT, 'PHP');      // Set User-Agent header to avoid 403
-            //\curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: token YOUR_ACCESS_TOKEN']); // If repo is private
-            
-            // Execute the request
-            $response = \curl_exec($ch);
-            
-            // Check for errors
-            if (curl_errno($ch)) {
-                echo "cURL Error: " . \curl_error($ch);
-                return null;
-            }
-            
-            // Close the cURL session
-            \curl_close($ch);
-            if($is_json === true){
-                $data = \json_decode($response, true) ?: [];
-                if(!$data){
-                    echo "Empty Dataset";
+        $curl__fn = function($url, $file = null){
+            try{
+                $verbose = ($_REQUEST['--verbose'] ?? null) ? true : false;
+                if($verbose){
+                    echo "Remote: {$url}\n";
                 }
-                if(($data['status'] ?? null) == '404'){
-                    echo "Repo may not exist - Please check the URL\n";
-                }
-                1 AND ($this->fn->dump)($data);
-                if($filter instanceof \closure){
-                    return ($filter)($data);
+                if(!($ch = \curl_init($url))){
+                    throw new \Exception("Failed: Unable to initialze curl");
+                };
+                \curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);  // Follow redirects
+                \curl_setopt($ch, CURLOPT_USERAGENT, 'PHP');      // Set User-Agent header to avoid 403
+                \curl_setopt($ch, CURLOPT_VERBOSE, $verbose);
+                if($file){
+                    if(!($fp = \fopen($file, 'w'))){
+                        throw new \Exception("Failed: Unable to open tempfile for writing");
+                    };
+                    \curl_setopt($ch, CURLOPT_FILE, $fp);
+                    \curl_exec($ch);
+                    if (\curl_errno($ch)) {
+                        throw new \Exception("Failed: cURL Error: " . \curl_error($ch));
+                    }
+                    if(($h = curl_getinfo($ch, CURLINFO_HTTP_CODE)) != 200){
+                        \is_file($file) AND unlink($file);
+                        throw new \Exception("Failed: Server responded with an {$h} error");
+                    }
+                    return \is_file($file);
                 } else {
-                    return $data;
+                    \curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    $response = \curl_exec($ch);
+                    if (\curl_errno($ch)) {
+                        throw new \Exception("Failed: cURL Error: " . \curl_error($ch));
+                    }
+                    $result = json_decode($response, true);
+                    if (json_last_error() === JSON_ERROR_NONE) {
+                        return $result;
+                    } else {
+                        throw new \Exception("Json Error Code:(".json_last_error()."): ".\json_last_error_msg());
+                    }
                 }
-                return ;
-            } else  {
-                return $response;
+            } catch (\Throwable $ex) {
+                if($file && \is_file($file)){
+                    \unlink($file);
+                }
+                throw $ex;
+            } finally {
+                empty($fp) OR \fclose($fp);
+                empty($ch) OR \curl_close($ch);
             }
         };
-        
-        $this->fn->cli_env_var = function(array $assoc) {
-            static $I = null; 
-            if(\is_null($I)){
-                $I = [];
-                \register_shutdown_function(function () use(&$I){
-                    if($I){
-                        \register_shutdown_function(function() use(&$I){
-                            $content = '';
-                            foreach($I as $k => $v){
-                                if(\is_scalar($v)){
-                                    $content .= "SET \"$k=$v\"\n";
-                                }
-                            }
-                            \file_put_contents(
-                                \trim(getenv('FX__ENV_FILE'),'"'),
-                                $content
-                            );
-                            exit(3);  // Exit with 3 to trigger batch execution
-                        });
-                    }
-                });
-            }
-            if($assoc){
-                $I = \array_replace($I, $assoc);
-            } else {
-                return $assoc;
-            }
-        };
-        
-        $this->fn->config_bat = function($k){
-            $x = \is_file($f = \_\FSESS_DIR."/.fw.config.bat")
-                ? (function($f){
-                    $vars = [];
-                    $lines = \file($f, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-                    foreach ($lines as $line) {
-                        if (preg_match('/^SET\s+FW__(\w+)=?(.*)$/i', $line, $m)) {
-                            $vars[$m[1]] = $m[2] ?? '';
-                        }
-                    }
-                    return $vars;
-                })($f)
-                : []
-            ;
-            if(\is_string($k)){
-                return $x[$k] ?? null;
-            } else if(\is_callable($k)){
-                ($k)($x);
-            } else if(\is_array($k)){
-                $x = \array_replace_recursive($x, $k);
-            } else {
-                throw new \Exception("Invalid argument for config");
-            }
-            \file_put_contents($f, \implode(
-                PHP_EOL, 
-                array_map(
-                    fn($k, $v) => "SET FW__{$k}={$v}", 
-                    array_keys($x), 
-                    $x
+        $iterator__fn = function($d){
+            return new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator(
+                    $d, 
+                    \FilesystemIterator::SKIP_DOTS
                 )
-            ));
+            );
+        };
+        
+        $verbose = ($_REQUEST['--verbose'] ?? null) ? true : false;
+        $lib_name = '--fw';
+        $lib_dir = \_\START_DIR."/{$lib_name}";
+        $local_dir = \_\START_DIR."/.local";
+        $install_info_file = "{$lib_dir}/.installed.json";
+        $source_slug = "klude-org/fw-lib-0";
 
-            $content = '';
-            foreach($x as $k => $v){
-                if(\is_scalar($v)){
-                    $content .= "SET \"$k=$v\"\n";
+        if($_REQUEST['-d'] ?? null){ //delete
+            if(!\is_dir($lib_dir)){
+                echo "Local: '{$lib_name}' doesn't exist.\n";
+            } else {
+                $fs_delete__fn($lib_dir);
+                echo "Local: '{$lib_name}' was deleted.\n";
+            }
+            return;
+        } else if($_REQUEST['-s'] ?? null){ //stash
+            if(!\is_dir($lib_dir)){
+                echo "Local: '{$lib_name}' doesn't exist.\n";
+            } else {
+                $dest_dir = \_\START_DIR."/{$lib_name}-stash-".\date('Y-md-Hi-s-').uniqid();
+                if(!\rename($lib_dir, $dest_dir)){
+                    throw new \Exception("Failed: Unable to modify the '{$lib_name}' directory - it might be in use!!!");
                 }
+                echo "Local: '{$lib_name}' was renamed to '{$fn__('basename',$dest_dir)}'\n";
             }
-            \file_put_contents($f, $content);
-        };
-        
-        $this->fn->config = function($k){
-            $x = \is_file($f = \_\FSESS_DIR."/.fw.config.php")
-                ? (\is_array($x = include $f) ? $x : [])
-                : []
-            ;
-            if(\is_string($k)){
-                return $x[$k] ?? null;
-            } else if(\is_callable($k)){
-                ($k)($x);
-            } else if(\is_array($k)){
-                $x = \array_replace_recursive($x, $k);
+            return;
+        } else if($_REQUEST['-b'] ?? null){ //backup
+            if(!\is_dir($lib_dir)){
+                echo "Local: '{$lib_name}' doesn't exist.\n";
             } else {
-                throw new \Exception("Invalid argument for config");
-            }
-            \file_put_contents($f,'<?php return '.\var_export($x,true).';');
-        };
-
-        $this->fn->path_is_rooted = function($p){
-            return $p && ($p[0] == '/' || ($p[1]??'')===':');
-        };
-        
-        $this->fn->my_lib = function($target_name) {
-            global $_;
-            if($target_name === true){
-                echo "LIB Dir: ".($_['LIB']['DIR'] ?? \_\LIB_DIR);
-            } else if($target_name === '!!!'){
-                ($this->fn->config)(function(&$x){ 
-                    unset($x['LIB']['DIR']);
-                    unset($x['CLI']['DIR']); 
-                });
-            } else if(
-                ($this->fn->path_is_rooted)($target_name) 
-                    ? \is_dir($d = $target_name)
-                    : (
-                        \is_dir($d = \_\FSESS_DIR.'/'.$target_name)
-                        || \is_dir($d = \_\START_DIR.'/'.$target_name)
-                    )
-            ){
-                ($this->fn->config)(function(&$x) use($d){ 
-                    $x['LIB']['DIR'] = $d;
-                    unset($x['CLI']['DIR']); 
-                });
-            } else {
-                echo "Failed: Module Not Found '{$target_name}'\n";
-            }
-        };
-        
-        $this->fn->my_cli = function($target_name) {
-            global $_;
-            if($target_name === true){
-                echo "CLI Dir: ".($_['CLI']['DIR'] ?? \_\LIB_DIR.'/-setup');
-            } else if($target_name === '!!!'){
-                ($this->fn->config)(function(&$x){ unset($x['CLI']['DIR']); });
-            } else if(\is_dir($d = \_\LIB_DIR.'/'.$target_name)){
-                ($this->fn->config)(fn(&$x) => $x['CLI']['DIR'] = $d);
-            } else {
-                echo "Failed: Module Not Found '{$target_name}'\n";
-            }
-        };
-        
-        $this->fn->my_setup = function($target_name){
-            if($target_name === true){
-                $target_name = '-setup';
-            }
-            if(!\preg_match("#^[\w\-\.]+$#", $target_name,$m)){
-                echo "Failed: Invalid target name '{$target_name}'\n";
-                return;
-            }
-            echo "Target Name: {$target_name}\n";
-            $target_dir = \_\LIB_DIR.'/'.$target_name;
-            echo "Target Dir: {$target_dir}\n";
-            if(($d = $_REQUEST['-d'] ?? null) === true){
-                ($this->fn->fs_delete)($target_dir);
-                echo "Deleted: '{$target_name}' was successfully deleted\n";
-                return;
-            }
-            if(!\is_null($x = $_REQUEST['-i'] ?? null)){
-                $execute = true;
-                $source_hint = ($x === true)
-                    ? (($target_name == '-setup')
-                        ? 'klude-org/web-0'
-                        : null //* maybe some default source in the future
+                $zip_file = \_\START_DIR."/.local/{$lib_name}-temp-".uniqid().'.zip';
+                $zip = new \ZipArchive; 
+                $zip->open($zip_file, \ZipArchive::CREATE | \ZipArchive::OVERWRITE); 
+                $l = strlen("{$lib_dir}/");
+                foreach(
+                    new \RecursiveIteratorIterator(
+                        new \RecursiveDirectoryIterator(
+                            $lib_dir, 
+                            \FilesystemIterator::SKIP_DOTS
+                        )
                     ) 
-                    : $x
-                ;
-            } else if(!\is_null($x = $_REQUEST['-o'] ?? null)){
-                $execute = false;
-                $source_hint = ($x === true)
-                    ? (($target_name == '-setup')
-                        ? 'klude-org/web-0'
-                        : null //* maybe some default source in the future
-                    ) 
-                    : $x
-                ;
-            } else {
-                $execute = true;
-                if(!\is_dir($target_dir)){
-                    echo "Unavailable: '{$target_name}' does not exist";
-                    return;
+                    as $file
+                ){
+                    $zip->addFile($file, substr($file, $l));
+                } 
+                $zip->close();
+                $backup_file = \_\START_DIR."/.local/{$lib_name}-".\sha1_file($zip_file).\date('-Y-md-Hi-s').'.zip';
+                if(!\rename($zip_file, $backup_file)){
+                    throw new \Exception("Failed: Unable to modify the '{$lib_name}' directory - it might be in use!!!");
                 }
-                if(!\is_file($f = "{$target_dir}/.installed.json")){
-                    echo "Unavailable: '{$target_name}' is not an installed module";
-                    return;
+                echo "Local: '{$lib_name}' was backed up to '{$fn__('basename',$backup_file)}'\n";
+            }
+            return;
+        } else if(!\is_null($source_hint = $_REQUEST['-i'] ?? null)){ //install
+            $r_host = 'github';
+            $r_owner = 'klude-org';
+            $r_repo = 'fw-lib-0';
+            $r_version = ($source_hint === true) ? '0' : $source_hint;
+            $stash_dir = "{$local_dir}/{$lib_name}-stash-".\date('Y-md-Hi-s-').uniqid();
+            $zip_name = 'lib-cache-'.\str_replace('/','][',"[{$r_host}/{$r_owner}/{$r_repo}/{$r_version}]");
+            $zip_file = "{$local_dir}/{$zip_name}.zip";
+            $pkg_dir = $local_dir.'/temp-'.\uniqid();
+            if(\ctype_digit($r_version) || $r_version === '0'){
+                if(!($result = $curl__fn("https://api.github.com/repos/{$source_slug}/releases"))){
+                    throw new \Exception("Remote: '{$source_slug}' - No Releases Found!\n");
                 }
-                ($this->fn->dump)(\json_decode(\file_get_contents($f),true));
-                return;
+                if(!($v = $result[(int) $r_version]['tag_name'] ?? null)){
+                    if($count = \count($result) == 1){
+                        echo "{$fn__('count',$result)} release available for '{$source_slug}'\n";
+                        echo "index must be 0 (or don't specify a value)\n";
+                    } else {
+                        echo "{$fn__('count',$result)} releases available for '{$source_slug}'\n";
+                        echo "index range 0 - ".($count - 1)."\n";
+                    }
+                    throw new \Exception("Remote: '{$source_slug}' - Invalid Release Index {$r_version}!\n");
+                }
+                $r_version = $v;
             }
-            
-            echo "Source Hint: {$source_hint}\n";
-            $version_hint = (($v = $_REQUEST['-v'] ?? null) === true) ? '0' : $v;
-            echo "Version Hint: {$version_hint}\n";
-            if(!$source_hint){
-                echo "Failed: Invalid Source\n";
-                return;
-            }
-            if(\preg_match("#^(?<mod_host>[^/]+)/(?<mod_owner>[^/]+)/(?<mod_repo>[^/]+)$#", $source_hint,  $m)){
-                
-            } else if(\preg_match("#^(?<mod_owner>[^/]+)/(?<mod_repo>[^/]+)$#", $source_hint,  $m)){
-                $mod_host = 'github';
-            } else if(\preg_match("#^(?<mod_repo>[^/]+)$#", $source_hint,  $m)){
-                $mod_host = 'github';
-                $mod_owner = 'klude-org';
-            }
-            \extract($m = \array_filter($m, fn($k) => !is_numeric($k), ARRAY_FILTER_USE_KEY));
-            $mod_name = \str_replace('-','_',"{$mod_owner}__{$mod_repo}");
-            $mod_repo = 'fw-mod-'.$mod_repo;
-            $mod_file = \_\LOCAL_DIR.'/temp-'.uniqid().'.zip';
-            \is_dir($d = \dirname($mod_file)) OR \mkdir($d, 0777, true) OR (function($d){ 
-                throw new \Exception("Failed to create directory: $d");
+            \is_dir($d = $local_dir) OR \mkdir($d, 0777, true) OR (function($d){ 
+                throw new \Exception("Failed: Unable to create directory: $d");
             })($d);
-            
-            if(\is_null($version_hint)){
-                if(!($zipball_url = 
-                    ($this->selected_tag = ($this->fn->github_transact)(
-                        "https://api.github.com/repos/{$mod_owner}/{$mod_repo}/releases/latest", 
-                        true
-                    ))['zipball_url'] ?? null
+            if(\is_dir($lib_dir) && !\rename($lib_dir, $stash_dir)){
+                throw new \Exception("Failed: Unable to modify the '{$lib_name}' directory - it might be in use!!!");
+            }
+            if(!\is_file($zip_file)){
+                if(!$curl__fn(
+                    "https://github.com/{$source_slug}/archive/refs/tags/{$r_version}.zip", 
+                    $zip_file
                 )){
-                    echo "Failed: Unable to get source url of the latest release\n";
+                    echo "\033[91mFailed: Library couldn't be dowloaded\033[0m\n";
                     return;
                 }
-            } else if(\is_numeric($version_hint)){
-                if(!($zipball_url = 
-                    ($this->selected_tag = ($this->fn->github_transact)(
-                        "https://api.github.com/repos/{$mod_owner}/{$mod_repo}/tags", 
-                        true,
-                        fn($tags) => $tags[(int) $version_hint]
-                    ))['zipball_url'] ?? null
-                )){
-                    echo "Failed: Unable to get source url from tag index '{$version_hint}'\n";
-                    return;
-                }
+                echo "Library Downloaded: {$zip_name}\n";
             } else {
-                if(!($zipball_url = 
-                    ($this->selected_tag = ($this->fn->github_transact)(
-                        "https://api.github.com/repos/{$mod_owner}/{$mod_repo}/tags", 
-                        true,
-                        fn($tags) => current(array_filter($tags, fn($tag) => $tag['name'] == $version_hint))
-                    ))['zipball_url'] ?? null
-                )){
-                    echo "Failed: Unable to get source url from tag name '{$version_hint}'\n";
-                    return;
-                }
+                echo "Library Exists: {$zip_name}\n";
             }
-            echo "Source: {$zipball_url}\n";
-            if(!$execute){
-                return;
-            }
-            echo "Downloading ...\n";
-            if(!($contents = ($this->fn->github_transact)($zipball_url))){
-                return;
-            }
-            if(\file_put_contents($mod_file, $contents) === false){
-                echo "\033[91mError Downloading Module.\033[0m\n";
-                return;
-            }
-            echo "\033[92mModule Downloaded Successfully.\033[0m\n";
             try {
-                if (($zip = new \ZipArchive)->open($mod_file) !== true) {
-                    echo "Failed to open ZIP file.\n";
-                    return;
+                if (($zip = new \ZipArchive)->open($zip_file) !== true) {
+                    throw new \Exception("Failed: Unable to open ZIP file");
                 }
                 $sub_folder = \substr($s = $zip->getNameIndex(0), 0, \strpos($s, '/'));
-                \is_dir($d = \dirname($target_dir)) OR \mkdir($d, 0777, true) OR (function($d){ 
-                    throw new \Exception("Failed to create directory: $d");
-                })($d);
-                ($this->fn->fs_delete)($target_dir);
-                $zip->extractTo($temp = \_\LOCAL_DIR.'/temp-'.uniqid());
-                if(\is_dir($x = $temp.'/'.$sub_folder.'/src')){
-                    \rename($x, $target_dir);
-                    \file_put_contents(
-                        "{$target_dir}/.installed.json",
-                        \json_encode($this->selected_tag, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
-                    );
-                    if(\is_file($f = "{$target_dir}/.setup.php")){
-                        (function($f){ include $f; })($f);
-                        echo "\n";
-                    }
-                    echo "Module Installed Successfully\n";
-                } else {
-                    echo "Failed: Module doesn't have src directory\n";
-                }
-                ($this->fn->fs_delete)($temp); 
-            } finally {
-                $zip->close();
-                \unlink($mod_file);
-            }
-        };
-
-        global $_;
-        (isset($_) && \is_array($_)) OR $_ = [];
-        
-        \define('_\START_FILE', \str_replace('\\','/', __FILE__));
-        \define('_\START_DIR', \dirname(\_\START_FILE));
-        \define('_\FSESS_DIR', \str_replace('\\','/', \getenv('FW__SESS_DIR') ?: \getcwd()));
-        \define('_\INCP_DIR', \str_replace('\\','/', \dirname($_SERVER['SCRIPT_FILENAME'])));
-        \define('_\LOCAL_DIR', \_\INCP_DIR."/.local");
-        (\is_file($f = \_\FSESS_DIR."/.fw.config.php")) AND ($_ = \array_replace($_, \is_array($x = include $f) ? $x : []));
-        \define('_\LIB_DIR', $_['LIB']['DIR'] ?? null ?: \str_replace('\\','/',__DIR__.'/--fw'));
-        \define('_\CLI_DIR', ($_['CLI']['DIR'] ?? null ?: \_\LIB_DIR.'/-setup'));
-        \define('_\VND_DIR', \_\LIB_DIR.'/-vnd');
-        
-        \set_include_path(
-            (\is_dir(\_\CLI_DIR) ? \_\CLI_DIR.PATH_SEPARATOR : '').
-            \_\VND_DIR.PATH_SEPARATOR. //* this should always be there even if the dir is not present
-            \get_include_path()
-        );
-        \spl_autoload_extensions('-#.php,/-#.php');
-        \spl_autoload_register();
-        \set_exception_handler(function($ex){
-            ($this->fn->report)($ex);
-            exit();
-        });
-        \set_error_handler(function($severity, $message, $file, $line){
-            try {
-                throw new \ErrorException(
-                    $message, 
-                    0,
-                    $severity, 
-                    $file, 
-                    $line
-                );
-            } catch (\Throwable $ex) {
-                ($this->fn->report)($ex);
-                exit;
-            }
-        });
-        
-        $_REQUEST = (function(){
-            $parsed = [];
-            $key = null;
-            $args = \array_slice($argv = $_SERVER['argv'] ?? [], 1);
-            foreach ($args as $arg) {
-                if ($key !== null) {
-                    $parsed[$key] = $arg;
-                    $key = null;
-                } else if(\str_starts_with($arg, '-')){
-                    if(\str_ends_with($arg, ':')){
-                        $key = \substr($arg,0,-1);
-                    } else if(\str_contains($arg,':')) {
-                        [$k, $v] = \explode(':', $arg);
-                        $parsed[$k] = $v;
+                $zip->extractTo($pkg_dir);
+                if(\is_dir($x = "{$pkg_dir}/{$sub_folder}")){
+                    if(\rename($x, $lib_dir)){
+                        \file_put_contents($install_info_file,\json_encode(
+                            [
+                                'host' => $r_host,
+                                'owner' => $r_owner,
+                                'repo' => $r_repo,
+                                'version' => $r_version,
+                                'source' => "{$r_host}/{$r_owner}/{$r_repo}/{$r_version}",
+                            ],
+                            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+                        ));
+                        echo "\033[92mSelf Updated to {$r_version}.\033[0m\n";
                     } else {
-                        $parsed[$arg] = true;
+                        throw new \Exception("Failed: Unable to write updates '{$r_version}' to library '{$lib_name}'");
                     }
                 } else {
-                    $parsed[] = $arg;
+                    throw new \Exception("Failed: The extract doesn't have the folder '{$sub_folder}'");
                 }
+                $fs_delete__fn($stash_dir);
+            } catch (\Throwable $ex){
+                if(\is_dir($stash_dir)){
+                    \rename($stash_dir, $lib_dir);
+                }
+                throw $ex;
+            } finally {
+                if(!empty($pkg_dir) && \is_dir($pkg_dir)){
+                    $fs_delete__fn($pkg_dir);
+                }
+                empty($zip) OR $zip->close();
             }
-            if ($key !== null) {
-                $parsed[$key] = true;
-            }
-            return $parsed;
-        })();
-        
-        ($_REQUEST['--verbose'] ?? null) AND ($this->fn->dump)([
-            'CONFIG' => $GLOBALS['_'] ?? null,
-            'TSP' => \explode(PATH_SEPARATOR,get_include_path()),
-            'CONST' => \get_defined_constants(true)['user'],
-        ]);
-        
-        if(!\is_null($p = $_REQUEST['--my-setup'] ?? null)){
-            return function() use($p){ 
-                ($this->fn->my_setup)($p);
-            };
-        } else if(!\is_null($p = $_REQUEST['--my-cli'] ?? null)){
-            return function() use($p){ 
-                ($this->fn->my_cli)($p);
-            };
-        } else if(!\is_null($p = $_REQUEST['--my-lib'] ?? null)){
-            return function() use($p){ 
-                ($this->fn->my_lib)($p);
-            };
         } else {
-            $intfc = 'fw';
-            $path = \trim('__/'.\trim($_REQUEST[0] ?? '', '/'), '/');
-            if(
-                ($file = \stream_resolve_include_path("{$path}/-@{$intfc}.php"))
-                || ($file = \stream_resolve_include_path("{$path}-@{$intfc}.php"))
-            ){
-                return (function() use($file){
-                    (function(){
-                        foreach(\explode(PATH_SEPARATOR,get_include_path()) as $d){
-                            \is_file($f = "{$d}/.functions.php") AND include_once $f;
-                        }
-                    })();
-                    include $file;
-                })->bindTo($GLOBALS['--CTLR'] = (object)[]);
+            if(!\is_dir($lib_dir)){
+                echo "Local: '{$lib_name}' doesn't exist.\n";
             } else {
-                throw new \Exception("Not Found: ".($_REQUEST[0] ?? "/"));
+                if(
+                    !\is_file($install_info_file)
+                    || !($source = \json_decode(
+                        \file_get_contents($install_info_file),
+                        true
+                    )['source'] ?? null)
+                ) {
+                    echo "Local: '{$lib_name}' info is not available.\n";
+                } else {
+                    
+                }
+                echo "Local: '{$lib_name}' is from {$source}\n";
             }
+            if(!($result = $curl__fn("https://api.github.com/repos/{$source_slug}/tags"))){
+                echo "Remote: '{$source_slug}' - No Tags Found!\n";
+                return;
+            }
+            $verbose AND $dump__fn($result);
+            echo "Remote: '{$source_slug}' - Available Tags:\n";
+            foreach($result as $k => $v){
+                echo "- {$v['name']}\n";
+            }
+            if(!($result = $curl__fn("https://api.github.com/repos/{$source_slug}/releases"))){
+                echo "Remote: '{$source_slug}' - No Releases Found!\n";
+                return;
+            }
+            $verbose AND $dump__fn($result);
+            echo "Remote: '{$source_slug}' - Available Release Tags:\n";
+            foreach($result as $k => $v){
+                echo "- {$v['tag_name']}: {$v['name']}\n";
+            }
+            return;
         }
-    } catch (\Throwable $ex) {
-        return function() use($ex){
-            ($this->fn->report)($ex);
-        };
+    } else {
+        $intfc = 'fw';
+        $path = \trim('__/'.\trim($_REQUEST[0] ?? '', '/'), '/');
+        if(
+            ($file = \stream_resolve_include_path("{$path}/-@{$intfc}.php"))
+            || ($file = \stream_resolve_include_path("{$path}-@{$intfc}.php"))
+            || ($file = \stream_resolve_include_path("{$path}/-@.php"))
+            || ($file = \stream_resolve_include_path("{$path}-@.php"))
+        ){ 
+            (function() use($file){
+                (function(){
+                    foreach(\explode(PATH_SEPARATOR,get_include_path()) as $d){
+                        \is_file($f = "{$d}/.functions.php") AND include_once $f;
+                    }
+                })();
+                include $file;
+            })->bindTo($GLOBALS['--CTLR'] = (object)['fn' => (object)[]])();
+        } else {
+            throw new \Exception("Not Found: ".($_REQUEST[0] ?? "/"));
+        }
     }
-})->bindTo((object)[])()(); } catch (\Throwable $ex) {
-    echo "\033[91m\n"
-        .$ex::class.": {$ex->getMessage()}\n"
-        ."File: {$ex->getFile()}\n"
-        ."Line: {$ex->getLine()}\n"
-        ."\033[31m{$ex}\033[0m\n"
-    ;
+} catch (\Throwable $ex) {
+    if($_REQUEST['--verbose'] ?? null){
+        echo "\033[91m\n"
+            .$ex::class.": {$ex->getMessage()}\n"
+            ."File: {$ex->getFile()}\n"
+            ."Line: {$ex->getLine()}\n"
+            ."\033[31m{$ex}\033[0m\n"
+        ;
+    } else {
+        echo "\033[91m{$ex->getMessage()}\033[0m\n";
+    }
 }
 
 
