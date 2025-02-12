@@ -1,6 +1,5 @@
 ::<?php echo "\r   \r"; if(0): ?>
 :: Installed: #__FW_INSTALLED__#
-:: i'd like to be a tree - pilu (._.) // please keep this line in all versions - BP
 :: #####################################################################################################################
 :: #region LICENSE
 ::     /* 
@@ -34,6 +33,7 @@
 ::     */
 :: #endregion
 :: # ###################################################################################################################
+:: i'd like to be a tree - pilu (._.) // please keep this line in all versions - BP
 @echo off
 if not defined FY__SHELL (
     SET FY__SHELL=1
