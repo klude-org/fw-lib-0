@@ -33,16 +33,17 @@
 :: #endregion
 :: # ###################################################################################################################
 @echo off
+if not exist %~dp0.local mkdir %~dp0.local
 if not defined FY__SHELL (
     SET FY__SHELL=1
-    if not exist "%~dp0.fw.config.bat" (
-        echo SET FX__PHP_EXEC_STD_PATH=C:/xampp/current/php/php.exe > "%~dp0.fw.config.bat"
-        echo SET FX__PHP_EXEC_XDBG_PATH=C:/xampp/current/php__xdbg/php.exe >> "%~dp0.fw.config.bat"
-        echo SET FX__ENV_FILE="%~dp0___set_cli_env_vars__.bat" >> "%~dp0.fw.config.bat"
-        echo SET FX__DEBUG=0 >> "%~dp0.fw.config.bat"
-        echo SET FW__LIB_SHELL=1 >> "%~dp0.fw.config.bat"
+    if not exist "%~dp0.local\.fw.config.bat" (
+        echo SET FX__PHP_EXEC_STD_PATH=C:/xampp/current/php/php.exe > "%~dp0.local\.fw.config.bat"
+        echo SET FX__PHP_EXEC_XDBG_PATH=C:/xampp/current/php__xdbg/php.exe >> "%~dp0.local\.fw.config.bat"
+        echo SET FX__ENV_FILE="%~dp0___set_cli_env_vars__.bat" >> "%~dp0.local\.fw.config.bat"
+        echo SET FX__DEBUG=0 >> "%~dp0.local\.fw.config.bat"
+        echo SET FW__LIB_SHELL=1 >> "%~dp0.local\.fw.config.bat"
     )
-    call %~dp0.fw.config.bat
+    call %~dp0.local\.fw.config.bat
     cmd /k
     exit /b 0
 )
@@ -84,8 +85,8 @@ if not defined FW__MY_DIR (
 
 SET CMD_FILE_A=%~dp0--fw\-cmd\__\%1\-@fw.bat
 SET CMD_FILE_B=%~dp0--fw\-cmd\__\%1-@fw.bat
-SET PHP_FILE_C=%~dp0--fw\-fw\.fw.php
-SET PHP_FILE_D=%~dp0--fw\.fw.php
+SET PHP_FILE_C=%~dp0--fw\-fw\fw.php
+SET PHP_FILE_D=%~dp0.local\.fw.php
 
 if exist "%CMD_FILE_A%" (
     call %CMD_FILE_B% %*
@@ -123,7 +124,7 @@ exit /b 0
 
 \defined('_\MSTART') OR \define('_\MSTART', \microtime(true));
 if(
-    \is_file($fw_dot_php = __DIR__.'/.fw.php')
+    \is_file($fw_dot_php = __DIR__.'/.local/.fw.php')
     && ($_SERVER['argv'][1] ?? null) !== '--self-refresh'
 ){
     return include $fw_dot_php;

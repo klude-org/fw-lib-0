@@ -1,4 +1,5 @@
 <?php 
+# Installed: #__FW_INSTALLED__#
 ########################################################################################################################
 #region LICENSE
     /* 
@@ -32,30 +33,27 @@
     */
 #endregion
 # #######################################################################################################################
-
-# Installed: #__FW_INSTALLED__#
 # i'd like to be a tree - pilu (._.) // please keep this line in all versions - BP
 
 \defined('_\MSTART') OR \define('_\MSTART', \microtime(true));
 \define('_\FSESS_DIR', \str_replace('\\','/', \getenv('FW__SESS_DIR') ?: \getcwd()));
-(\is_file($f = \_\FSESS_DIR."/.fw.config.php")) AND ($_ = \array_replace($_, \is_array($x = include $f) ? $x : []));
+(\is_file($f = \_\FSESS_DIR."/.local/.fw.config.php")) AND ($_ = \array_replace($_, \is_array($x = include $f) ? $x : []));
 
 if(
     (\getenv('FW__LIB_SHELL') !== '0')
     && !\str_starts_with($_SERVER['argv'][1] ?? '', "--setup")
-    && \is_file($f = __DIR__.'/--fw/-fw/.fw.php')
+    && \is_file($f = __DIR__.'/../--fw/-fw/fw.php')
 ){
     return include $f;
 }
 try {
-        
+    
     global $_;
     (isset($_) && \is_array($_)) OR $_ = [];
     
-    \define('_\START_FILE', \str_replace('\\','/', __FILE__));
-    \define('_\START_DIR', \dirname(\_\START_FILE));
+    \define('_\BASE_DIR', \str_replace('\\','/', \dirname(__DIR__)));
     \define('_\INCP_DIR', \str_replace('\\','/', \dirname($_SERVER['SCRIPT_FILENAME'])));
-    \set_include_path($_['TSP']['PATH'] ?? \_\START_DIR.PATH_SEPARATOR.\get_include_path());
+    \set_include_path($_['TSP']['PATH'] ?? \_\BASE_DIR.PATH_SEPARATOR.\get_include_path());
     \spl_autoload_extensions('-#.php,/-#.php');
     \spl_autoload_register();
     \set_error_handler(function($severity, $message, $file, $line){
@@ -189,8 +187,8 @@ try {
         
         $verbose = ($_REQUEST['--verbose'] ?? null) ? true : false;
         $lib_name = '--fw';
-        $lib_dir = \_\START_DIR."/{$lib_name}";
-        $local_dir = \_\START_DIR."/.local";
+        $lib_dir = \_\BASE_DIR."/{$lib_name}";
+        $local_dir = \_\BASE_DIR."/.local";
         $install_info_file = "{$lib_dir}/.installed.json";
         $source_slug = "klude-org/fw-lib-0";
 
@@ -206,7 +204,7 @@ try {
             if(!\is_dir($lib_dir)){
                 echo "Local: '{$lib_name}' doesn't exist.\n";
             } else {
-                $dest_dir = \_\START_DIR."/{$lib_name}-stash-".\date('Y-md-Hi-s-').uniqid();
+                $dest_dir = \_\BASE_DIR."/{$lib_name}-stash-".\date('Y-md-Hi-s-').uniqid();
                 if(!\rename($lib_dir, $dest_dir)){
                     throw new \Exception("Failed: Unable to modify the '{$lib_name}' directory - it might be in use!!!");
                 }
@@ -217,7 +215,7 @@ try {
             if(!\is_dir($lib_dir)){
                 echo "Local: '{$lib_name}' doesn't exist.\n";
             } else {
-                $zip_file = \_\START_DIR."/.local/{$lib_name}-temp-".uniqid().'.zip';
+                $zip_file = \_\BASE_DIR."/.local/{$lib_name}-temp-".uniqid().'.zip';
                 $zip = new \ZipArchive; 
                 $zip->open($zip_file, \ZipArchive::CREATE | \ZipArchive::OVERWRITE); 
                 $l = strlen("{$lib_dir}/");
@@ -233,7 +231,7 @@ try {
                     $zip->addFile($file, substr($file, $l));
                 } 
                 $zip->close();
-                $backup_file = \_\START_DIR."/.local/{$lib_name}-".\sha1_file($zip_file).\date('-Y-md-Hi-s').'.zip';
+                $backup_file = \_\BASE_DIR."/.local/{$lib_name}-".\sha1_file($zip_file).\date('-Y-md-Hi-s').'.zip';
                 if(!\rename($zip_file, $backup_file)){
                     throw new \Exception("Failed: Unable to modify the '{$lib_name}' directory - it might be in use!!!");
                 }
@@ -246,8 +244,6 @@ try {
             $r_repo = 'fw-lib-0';
             $r_version = ($source_hint === true) ? '0' : $source_hint;
             $stash_dir = "{$local_dir}/{$lib_name}-stash-".\date('Y-md-Hi-s-').uniqid();
-            $zip_name = 'lib-cache-'.\str_replace('/','][',"[{$r_host}/{$r_owner}/{$r_repo}/{$r_version}]");
-            $zip_file = "{$local_dir}/{$zip_name}.zip";
             $pkg_dir = $local_dir.'/temp-'.\uniqid();
             if(\ctype_digit($r_version) || $r_version === '0'){
                 if(!($result = $curl__fn("https://api.github.com/repos/{$source_slug}/releases"))){
@@ -265,6 +261,8 @@ try {
                 }
                 $r_version = $v;
             }
+            $zip_name = 'lib-cache-'.\str_replace('/','][',"[{$r_host}/{$r_owner}/{$r_repo}/{$r_version}]");
+            $zip_file = "{$local_dir}/{$zip_name}.zip";
             \is_dir($d = $local_dir) OR \mkdir($d, 0777, true) OR (function($d){ 
                 throw new \Exception("Failed: Unable to create directory: $d");
             })($d);
@@ -289,7 +287,7 @@ try {
                 }
                 $sub_folder = \substr($s = $zip->getNameIndex(0), 0, \strpos($s, '/'));
                 $zip->extractTo($pkg_dir);
-                if(\is_dir($x = "{$pkg_dir}/{$sub_folder}")){
+                if(\is_dir($x = "{$pkg_dir}/{$sub_folder}/src")){
                     if(\rename($x, $lib_dir)){
                         \file_put_contents($install_info_file,\json_encode(
                             [
