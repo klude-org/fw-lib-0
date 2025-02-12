@@ -1,1 +1,1 @@
-/src/.fw-shell export-ignore
+/.fw-shell-* export-ignore

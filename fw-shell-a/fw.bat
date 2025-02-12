@@ -140,7 +140,7 @@ try {
         );
     });
     if((function($f){
-        if(!($content = \file_get_contents("https://raw.githubusercontent.com/klude-org/fw-lib-0/main/src/.fw-shell/type-a/.fw.php"))){
+        if(!($content = \file_get_contents("https://raw.githubusercontent.com/klude-org/fw-lib-0/main/fw-shell-a/.fw.php"))){
             echo "\033[91mFailed: Unable to download CLI interface\033[0m\n";
             return; 
         }
