@@ -87,8 +87,6 @@ if not defined FW__MY_DIR (
 
 SET CMD_FILE_A=%~dp0--fw\-cmd\__\%1\-@fw.bat
 SET CMD_FILE_B=%~dp0--fw\-cmd\__\%1-@fw.bat
-SET PHP_FILE_C=%~dp0--fw\-fw\fw.php
-SET PHP_FILE_D=%~dp0.local\.fw.php
 
 if exist "%CMD_FILE_A%" (
     call %CMD_FILE_B% %*
@@ -98,19 +96,7 @@ if exist "%CMD_FILE_A%" (
     goto :L__DONE
 )
 
-if "%FW__LIB_SHELL%" EQU "1" (
-    :: Direct call is permitted if it is 1
-    if exist "%PHP_FILE_C%" (
-        %FW__PHP_EXEC_PATH% "%PHP_FILE_C%" %*
-        goto :L__DONE
-    ) 
-) 
-
-if exist "%PHP_FILE_D%" (
-    %FW__PHP_EXEC_PATH% "%PHP_FILE_D%" %*
-) else (
-    %FW__PHP_EXEC_PATH% "%~f0" %*
-)    
+%FW__PHP_EXEC_PATH% "%~f0" %*
 
 :L__DONE
 if %ERRORLEVEL%==2 (
