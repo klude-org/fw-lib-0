@@ -1,5 +1,4 @@
 ::<?php echo "\r   \r"; if(0): ?>
-:: Installed: #__FW_INSTALLED__#
 :: #####################################################################################################################
 :: #region LICENSE
 ::     /* 
@@ -33,18 +32,18 @@
 ::     */
 :: #endregion
 :: # ###################################################################################################################
-:: i'd like to be a tree - pilu (._.) // please keep this line in all versions - BP
 @echo off
+if not exist %~dp0.local mkdir %~dp0.local
 if not defined FY__SHELL (
     SET FY__SHELL=1
-    if not exist "%~dp0.fw.config.bat" (
-        echo SET FX__PHP_EXEC_STD_PATH=C:/xampp/current/php/php.exe > "%~dp0.fw.config.bat"
-        echo SET FX__PHP_EXEC_XDBG_PATH=C:/xampp/current/php__xdbg/php.exe >> "%~dp0.fw.config.bat"
-        echo SET FX__ENV_FILE="%~dp0___set_cli_env_vars__.bat" >> "%~dp0.fw.config.bat"
-        echo SET FX__DEBUG=0 >> "%~dp0.fw.config.bat"
-        echo SET FW__LIB_SHELL=1 >> "%~dp0.fw.config.bat"
+    if not exist "%~dp0.local\.fw.config.bat" (
+        echo SET FX__PHP_EXEC_STD_PATH=C:/xampp/current/php/php.exe > "%~dp0.local\.fw.config.bat"
+        echo SET FX__PHP_EXEC_XDBG_PATH=C:/xampp/current/php__xdbg/php.exe >> "%~dp0.local\.fw.config.bat"
+        echo SET FX__ENV_FILE="%~dp0___set_cli_env_vars__.bat" >> "%~dp0.local\.fw.config.bat"
+        echo SET FX__DEBUG=0 >> "%~dp0.local\.fw.config.bat"
+        echo SET FW__LIB_SHELL=1 >> "%~dp0.local\.fw.config.bat"
     )
-    call %~dp0.fw.config.bat
+    call %~dp0.local\.fw.config.bat
     cmd /k
     exit /b 0
 )
@@ -86,8 +85,8 @@ if not defined FW__MY_DIR (
 
 SET CMD_FILE_A=%~dp0--fw\-cmd\__\%1\-@fw.bat
 SET CMD_FILE_B=%~dp0--fw\-cmd\__\%1-@fw.bat
-SET PHP_FILE_C=%~dp0--fw\-fw\.fw.php
-SET PHP_FILE_D=%~dp0--fw\.fw.php
+SET PHP_FILE_C=%~dp0--fw\-fw\fw.php
+SET PHP_FILE_D=%~dp0.local\.fw.php
 
 if exist "%CMD_FILE_A%" (
     call %CMD_FILE_B% %*
@@ -123,27 +122,25 @@ exit /b 0
 
 <?php endif; 
 
-
 \defined('_\MSTART') OR \define('_\MSTART', \microtime(true));
 \define('_\FSESS_DIR', \str_replace('\\','/', \getenv('FW__SESS_DIR') ?: \getcwd()));
-(\is_file($f = \_\FSESS_DIR."/.fw.config.php")) AND ($_ = \array_replace($_, \is_array($x = include $f) ? $x : []));
+(\is_file($f = \_\FSESS_DIR."/.local/.fw.config.php")) AND ($_ = \array_replace($_, \is_array($x = include $f) ? $x : []));
 
 if(
     (\getenv('FW__LIB_SHELL') !== '0')
     && !\str_starts_with($_SERVER['argv'][1] ?? '', "--setup")
-    && \is_file($f = __DIR__.'/--fw/-fw/.fw.php')
+    && \is_file($f = __DIR__.'/../--fw/-fw/fw.php')
 ){
     return include $f;
 }
 try {
-        
+    
     global $_;
     (isset($_) && \is_array($_)) OR $_ = [];
     
-    \define('_\START_FILE', \str_replace('\\','/', __FILE__));
-    \define('_\START_DIR', \dirname(\_\START_FILE));
+    \define('_\BASE_DIR', \str_replace('\\','/', \dirname(__DIR__)));
     \define('_\INCP_DIR', \str_replace('\\','/', \dirname($_SERVER['SCRIPT_FILENAME'])));
-    \set_include_path($_['TSP']['PATH'] ?? \_\START_DIR.PATH_SEPARATOR.\get_include_path());
+    \set_include_path($_['TSP']['PATH'] ?? \_\BASE_DIR.PATH_SEPARATOR.\get_include_path());
     \spl_autoload_extensions('-#.php,/-#.php');
     \spl_autoload_register();
     \set_error_handler(function($severity, $message, $file, $line){
@@ -249,11 +246,11 @@ try {
                     if (\curl_errno($ch)) {
                         throw new \Exception("Failed: cURL Error: " . \curl_error($ch));
                     }
-                    $result = json_decode($response, true);
-                    if (json_last_error() === JSON_ERROR_NONE) {
+                    $result = \json_decode($response, true);
+                    if (\json_last_error() === JSON_ERROR_NONE) {
                         return $result;
                     } else {
-                        throw new \Exception("Json Error Code:(".json_last_error()."): ".\json_last_error_msg());
+                        throw new \Exception("Json Error Code:(".\json_last_error()."): ".\json_last_error_msg());
                     }
                 }
             } catch (\Throwable $ex) {
@@ -277,8 +274,8 @@ try {
         
         $verbose = ($_REQUEST['--verbose'] ?? null) ? true : false;
         $lib_name = '--fw';
-        $lib_dir = \_\START_DIR."/{$lib_name}";
-        $local_dir = \_\START_DIR."/.local";
+        $lib_dir = \_\BASE_DIR."/{$lib_name}";
+        $local_dir = \_\BASE_DIR."/.local";
         $install_info_file = "{$lib_dir}/.installed.json";
         $source_slug = "klude-org/fw-lib-0";
 
@@ -294,7 +291,7 @@ try {
             if(!\is_dir($lib_dir)){
                 echo "Local: '{$lib_name}' doesn't exist.\n";
             } else {
-                $dest_dir = \_\START_DIR."/{$lib_name}-stash-".\date('Y-md-Hi-s-').uniqid();
+                $dest_dir = \_\BASE_DIR."/{$lib_name}-stash-".\date('Y-md-Hi-s-').uniqid();
                 if(!\rename($lib_dir, $dest_dir)){
                     throw new \Exception("Failed: Unable to modify the '{$lib_name}' directory - it might be in use!!!");
                 }
@@ -305,7 +302,7 @@ try {
             if(!\is_dir($lib_dir)){
                 echo "Local: '{$lib_name}' doesn't exist.\n";
             } else {
-                $zip_file = \_\START_DIR."/.local/{$lib_name}-temp-".uniqid().'.zip';
+                $zip_file = \_\BASE_DIR."/.local/{$lib_name}-temp-".uniqid().'.zip';
                 $zip = new \ZipArchive; 
                 $zip->open($zip_file, \ZipArchive::CREATE | \ZipArchive::OVERWRITE); 
                 $l = strlen("{$lib_dir}/");
@@ -321,7 +318,7 @@ try {
                     $zip->addFile($file, substr($file, $l));
                 } 
                 $zip->close();
-                $backup_file = \_\START_DIR."/.local/{$lib_name}-".\sha1_file($zip_file).\date('-Y-md-Hi-s').'.zip';
+                $backup_file = \_\BASE_DIR."/.local/{$lib_name}-".\sha1_file($zip_file).\date('-Y-md-Hi-s').'.zip';
                 if(!\rename($zip_file, $backup_file)){
                     throw new \Exception("Failed: Unable to modify the '{$lib_name}' directory - it might be in use!!!");
                 }
@@ -334,8 +331,6 @@ try {
             $r_repo = 'fw-lib-0';
             $r_version = ($source_hint === true) ? '0' : $source_hint;
             $stash_dir = "{$local_dir}/{$lib_name}-stash-".\date('Y-md-Hi-s-').uniqid();
-            $zip_name = 'lib-cache-'.\str_replace('/','][',"[{$r_host}/{$r_owner}/{$r_repo}/{$r_version}]");
-            $zip_file = "{$local_dir}/{$zip_name}.zip";
             $pkg_dir = $local_dir.'/temp-'.\uniqid();
             if(\ctype_digit($r_version) || $r_version === '0'){
                 if(!($result = $curl__fn("https://api.github.com/repos/{$source_slug}/releases"))){
@@ -353,6 +348,8 @@ try {
                 }
                 $r_version = $v;
             }
+            $zip_name = 'lib-cache-'.\str_replace('/','][',"[{$r_host}/{$r_owner}/{$r_repo}/{$r_version}]");
+            $zip_file = "{$local_dir}/{$zip_name}.zip";
             \is_dir($d = $local_dir) OR \mkdir($d, 0777, true) OR (function($d){ 
                 throw new \Exception("Failed: Unable to create directory: $d");
             })($d);
@@ -377,7 +374,7 @@ try {
                 }
                 $sub_folder = \substr($s = $zip->getNameIndex(0), 0, \strpos($s, '/'));
                 $zip->extractTo($pkg_dir);
-                if(\is_dir($x = "{$pkg_dir}/{$sub_folder}")){
+                if(\is_dir($x = "{$pkg_dir}/{$sub_folder}/src")){
                     if(\rename($x, $lib_dir)){
                         \file_put_contents($install_info_file,\json_encode(
                             [
@@ -478,5 +475,3 @@ try {
         echo "\033[91m{$ex->getMessage()}\033[0m\n";
     }
 }
-
-

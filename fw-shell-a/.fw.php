@@ -261,7 +261,7 @@ try {
                 }
                 $r_version = $v;
             }
-            $zip_name = 'lib-cache-'.\str_replace('/','][',"[{$r_host}/{$r_owner}/{$r_repo}/{$r_version}]");
+            $zip_name = 'lib-'.\str_replace('/','][',"[{$r_host}/{$r_owner}/{$r_repo}/{$r_version}]");
             $zip_file = "{$local_dir}/{$zip_name}.zip";
             \is_dir($d = $local_dir) OR \mkdir($d, 0777, true) OR (function($d){ 
                 throw new \Exception("Failed: Unable to create directory: $d");
