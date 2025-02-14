@@ -1,4 +1,5 @@
 ::<?php echo "\r   \r"; if(0): ?>
+:: Installed: #__FW_INSTALLED__#
 :: #####################################################################################################################
 :: #region LICENSE
 ::     /* 
@@ -32,6 +33,7 @@
 ::     */
 :: #endregion
 :: # ###################################################################################################################
+:: # i'd like to be a tree - pilu (._.) // please keep this line in all versions - BP
 @echo off
 if not exist %~dp0.local mkdir %~dp0.local
 if not defined FY__SHELL (
@@ -39,7 +41,7 @@ if not defined FY__SHELL (
     if not exist "%~dp0.local\.fw.config.bat" (
         echo SET FX__PHP_EXEC_STD_PATH=C:/xampp/current/php/php.exe > "%~dp0.local\.fw.config.bat"
         echo SET FX__PHP_EXEC_XDBG_PATH=C:/xampp/current/php__xdbg/php.exe >> "%~dp0.local\.fw.config.bat"
-        echo SET FX__ENV_FILE="%~dp0___set_cli_env_vars__.bat" >> "%~dp0.local\.fw.config.bat"
+        echo SET FX__ENV_FILE="%~dp0.local\___set_cli_env_vars__.bat" >> "%~dp0.local\.fw.config.bat"
         echo SET FX__DEBUG=0 >> "%~dp0.local\.fw.config.bat"
         echo SET FW__LIB_SHELL=1 >> "%~dp0.local\.fw.config.bat"
     )
@@ -180,7 +182,27 @@ try {
         return $parsed;
     })();
     
-    if(!\is_null($_REQUEST['--setup'] ?? null)){
+    if(($key = \array_key_first($_REQUEST)) === 0){
+        $intfc = 'fw';
+        $path = \trim('__/'.\trim($_REQUEST[0] ?? '', '/'), '/');
+        if(
+            ($file = \stream_resolve_include_path("{$path}/-@{$intfc}.php"))
+            || ($file = \stream_resolve_include_path("{$path}-@{$intfc}.php"))
+            || ($file = \stream_resolve_include_path("{$path}/-@.php"))
+            || ($file = \stream_resolve_include_path("{$path}-@.php"))
+        ){ 
+            (function() use($file){
+                (function(){
+                    foreach(\explode(PATH_SEPARATOR,get_include_path()) as $d){
+                        \is_file($f = "{$d}/.functions.php") AND include_once $f;
+                    }
+                })();
+                include $file;
+            })->bindTo($GLOBALS['--CTLR'] = (object)['fn' => (object)[]])();
+        } else {
+            throw new \Exception("Not Found: ".($_REQUEST[0] ?? "/"));
+        }
+    } else if($key === '--setup') {
         $fn__ = function($fname,...$args){
             return $fname(...$args);
         };
@@ -442,26 +464,27 @@ try {
             }
             return;
         }
-    } else {
-        $intfc = 'fw';
-        $path = \trim('__/'.\trim($_REQUEST[0] ?? '', '/'), '/');
-        if(
-            ($file = \stream_resolve_include_path("{$path}/-@{$intfc}.php"))
-            || ($file = \stream_resolve_include_path("{$path}-@{$intfc}.php"))
-            || ($file = \stream_resolve_include_path("{$path}/-@.php"))
-            || ($file = \stream_resolve_include_path("{$path}-@.php"))
-        ){ 
-            (function() use($file){
-                (function(){
-                    foreach(\explode(PATH_SEPARATOR,get_include_path()) as $d){
-                        \is_file($f = "{$d}/.functions.php") AND include_once $f;
-                    }
-                })();
-                include $file;
-            })->bindTo($GLOBALS['--CTLR'] = (object)['fn' => (object)[]])();
-        } else {
-            throw new \Exception("Not Found: ".($_REQUEST[0] ?? "/"));
+    } else if($key === '--self') {
+        if($_REQUEST['-i'] ?? null){
+            if(!($content = \file_get_contents("https://raw.githubusercontent.com/klude-org/fw-lib-0/main/fw-shell-b/fw.bat"))){
+                throw new \Exception("Failed: Unable to download latest CLI interface");
+                return; 
+            }
+            $content = \str_replace(
+                '#'.'__FW_INSTALLED__'.'#', 
+                '#'.\json_encode([
+                    "source" => "github/klude-org/fw-lib-0/main",
+                    "version" => "main",
+                    "variant" => "fw-shell-b",
+                    "installed_on" => \date('Y-m-d H:i:s'),
+                ], JSON_UNESCAPED_SLASHES).'#', 
+                $content
+            );
+            \file_put_contents(__FILE__, $content);
+            echo "\033[92mCLI interface installed successfully\033[0m\n";
         }
+    } else {
+        throw new \Exception("Invalid Command: ");
     }
 } catch (\Throwable $ex) {
     if($_REQUEST['--verbose'] ?? null){
