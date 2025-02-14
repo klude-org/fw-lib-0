@@ -473,8 +473,8 @@ try {
             $content = \str_replace(
                 '#'.'__FW_INSTALLED__'.'#', 
                 '#'.\json_encode([
+                    "type" => "shell",
                     "source" => "github/klude-org/fw-lib-0/main",
-                    "version" => "main",
                     "variant" => "fw-shell-b",
                     "installed_on" => \date('Y-m-d H:i:s'),
                 ], JSON_UNESCAPED_SLASHES).'#', 
