@@ -1,5 +1,6 @@
 {
     "include": [
+        "src",
         ".htaccess",
         "index.php",
         "composer.json",
